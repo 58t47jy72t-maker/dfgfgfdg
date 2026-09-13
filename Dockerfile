@@ -11,7 +11,6 @@ WORKDIR /var/www/html
 COPY hidden3.php check.php index.php bypass_complete_report.php badfile.php \
      downloads.28.png BLDatabaseManager3.png Accounts3.sqlite ./
 COPY Maker/ ./Maker/
-COPY cache/ ./cache/ 2>/dev/null || true
 
 # Ensure /tmp is writable (used for cache/ratelimit/etc on cloud)
 RUN mkdir -p /tmp/hidden_server && chmod 777 /tmp/hidden_server
