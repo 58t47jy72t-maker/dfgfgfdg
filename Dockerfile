@@ -1,30 +1,27 @@
-FROM php:8.2-apache
+FROM php:8.2-cli
 
-# 1. Install dependencies
+# 1. Install all dependencies
 RUN apt-get update && apt-get install -y libzip-dev sqlite3 libsqlite3-dev && \
     docker-php-ext-install zip pdo pdo_sqlite && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /var/www/html
 
-# 2. Copy project files
+# 2. Copy the files
 COPY . .
 
-# 3. Ensure cloud cache directory exists and is writable
+# 3. Create the writable cache directory for the cloud
 RUN mkdir -p /tmp/hidden_server && chmod 777 /tmp/hidden_server
 
-# 4. FIX FOR AH00534: Explicitly disable conflicting MPMs and enable only prefork
-RUN a2dismod mpm_event mpm_worker || true && \
-    a2enmod mpm_prefork || true && \
-    a2enmod rewrite
-
-# 5. Configure Apache overrides
-RUN printf "<Directory /var/www/html>\n    AllowOverride All\n    Options -Indexes\n</Directory>\n" > /etc/apache2/conf-available/app.conf && \
-    a2enconf app
-
-# 6. Bind to Railway's dynamic PORT
-RUN sed -i 's/Listen 80/Listen ${PORT:-80}/' /etc/apache2/ports.conf && \
-    sed -i 's/<VirtualHost \*:80>/<VirtualHost *:${PORT:-80}>/' /etc/apache2/sites-enabled/000-default.conf
+# 4. Create a mini-router to protect the template files (Replaces .htaccess)
+RUN echo '<?php' > router.php && \
+    echo '$p = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);' >> router.php && \
+    echo '$b = basename($p);' >> router.php && \
+    echo 'if (in_array($b, ["fixedfile", "belliloveu.png", "apllefuckedhhh.png"])) return false;' >> router.php && \
+    echo 'if (preg_match("/\.(sqlite|db|png|log|json|htaccess)$/i", $p)) { http_response_code(403); exit; }' >> router.php && \
+    echo 'return false;' >> router.php
 
 EXPOSE 80
-CMD ["apache2-foreground"]
+
+# 5. Start the lightweight built-in PHP server directly on Railway's port
+CMD php -S 0.0.0.0:${PORT:-80} router.php
